@@ -17,8 +17,13 @@
   --shadow: 0 1px 2px rgba(20, 20, 40, 0.05);
 }
 
+/*
+ * Dark tokens apply either when the OS prefers dark and the user hasn't
+ * overridden it (:not([data-theme="light"])), or when the toggle has pinned
+ * dark explicitly ([data-theme="dark"]) regardless of the OS setting.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --border: #32323c;
     --border-strong: #45454f;
     --bg: #131318;
@@ -33,6 +38,22 @@
     --focus: #7d95f0;
     --shadow: none;
   }
+}
+
+:root[data-theme='dark'] {
+  --border: #32323c;
+  --border-strong: #45454f;
+  --bg: #131318;
+  --panel-bg: #1c1c22;
+  --text: #ececf1;
+  --muted: #9a9aa6;
+  --positive: #4ade80;
+  --negative: #ff6b6b;
+  --accent: #7d95f0;
+  --accent-contrast: #12121a;
+  --chip-bg: #26262e;
+  --focus: #7d95f0;
+  --shadow: none;
 }
 
 * {
@@ -52,6 +73,13 @@ body {
   padding: 24px 16px 64px;
 }
 
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .app-header h1 {
   margin: 0 0 4px;
   font-size: 1.6rem;
@@ -62,6 +90,13 @@ body {
   color: var(--muted);
   margin: 0 0 20px;
   font-size: 0.9rem;
+}
+
+.theme-toggle {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 /* Money reads as a column, so keep the digits from shifting width. */
