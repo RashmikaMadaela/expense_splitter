@@ -99,3 +99,55 @@ Confirmed in a real browser after the rewrite: same balances, same 3-payment tra
 - `npm run test` — 65/65 passing across 5 suites, including the oracle and fuzz tests.
 - `npx tsc --noEmit` and `npm run build` — clean.
 - Browser regression: acceptance scenario byte-identical to Phase 1; 99.99% percentage split rejected; 3-decimal amount rejected with inline feedback; rotation spread the extra cent across Alice, Bob and Carol over 6 identical splits; hand-corrupted `localStorage` fell back to empty state with no "Rs. NaN" anywhere; zero console errors.
+
+---
+
+# Phase 3 — UI/UX and group management
+
+With the maths settled, the remaining gap was the interface. Work happened on `feat/ui-ux-improvements`, branched from `main` after the Phase 2 PR merged.
+
+## 12. The trigger, and what auditing around it found
+
+The requested feature was a way to clear the data and start a new group — without it the app was effectively single-use per browser, since a second trip meant clearing site data by hand.
+
+Auditing the UI while adding it turned up defects rather than just rough edges. Two greps did most of the work:
+
+```
+grep -c "@media" src/index.css   ->  0
+grep -c "focus"  src/index.css   ->  0
+```
+
+No responsive layout at all, in an app whose entire use case is a group on a trip, i.e. on phones. And no focus styling, so keyboard navigation was invisible.
+
+The worst one was subtler. **Clicking Edit on an expense appeared to do nothing.** The form sits above the list, so changing `editingExpense` re-rendered it off-screen with no scroll, no highlight and no focus change. With three or more expenses logged, the user clicks Edit and the viewport doesn't move. Nothing was broken in the state layer — it was purely that the UI gave no feedback — which is exactly the class of bug unit tests never catch.
+
+Two more: duplicate names were silently accepted, leaving two indistinguishable "Alice" entries in every dropdown, checkbox list, balance row and settlement line; and expense deletion used native `confirm()`, which can't show what is actually being deleted.
+
+## 13. Making person removal safe rather than skipping it
+
+Phase 1 documented "no person deletion" because removing someone referenced by an expense orphans their shares, and the brief doesn't say what should happen. That reasoning was sound but the conclusion was broader than it needed to be.
+
+The narrower rule: **refuse removal only while the person is actually referenced** — as payer, participant or share holder. Unreferenced people can go freely, and renaming is always safe because ids are stable and every reference is by id (asserted by a test comparing balances before and after a rename). The check lives in `lib/people.ts` and is used by both the UI, which disables the button and explains why, and the reducer, which refuses the action regardless — so the two cannot drift apart.
+
+`CLEAR_ALL` needed no storage wiring: the existing persist effect in `AppContext` rewrites localStorage whenever state changes, so resetting state clears the saved group as a consequence.
+
+## 14. Verification
+
+Logic tests were untouched, which was the point — the 65 existing tests passing unmodified is the regression signal that none of this reached the calculation layer. 28 new tests cover the reducer actions and people helpers, for 93 total.
+
+Browser-driven checks, including things a unit test can't express:
+
+- Acceptance scenario **unchanged**: same balances, same 3-payment settlement.
+- Edit-scroll fix measured on a deliberately overflowing page: `scrollY` 990 → 0, form in viewport, description field focused.
+- Removal blocked for a referenced person with the reason shown ("Alice is involved in 2 expenses"), allowed for an uninvolved one.
+- Rename propagated through to the settlement lines.
+- Clear all → confirm → empty, and still empty after reload with `localStorage` holding `{"version":2,"people":[],"expenses":[]}`.
+- Esc cancels the dialog without destroying anything.
+- Horizontal overflow measured at 0px at 375px; tab bar checked at 320/375/414px after moving the step numbers into a span that narrow screens hide — at 375px the fourth tab had been clipped.
+- Focus ring present on every element in tab order; dark mode screenshotted.
+
+## 15. Final checks
+
+- `npm run test` — 93/93 across 7 suites.
+- `npx tsc --noEmit` and `npm run build` — clean.
+- Zero console errors across every browser run.

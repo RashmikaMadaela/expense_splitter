@@ -36,7 +36,9 @@ There is no backend and no login — everything runs client-side and persists to
 - **Mismatched splits (bonus) are blocked at save time, not auto-adjusted or silently allowed.** For Exact splits, entered amounts must sum to the expense total exactly; for Percentage splits, to exactly 100%. This was the simplest of the reasonable options (block vs. auto-adjust vs. warn-only) and keeps the source of truth unambiguous — the user always knows exactly what they entered.
 - **Stored shares are canonical, never re-derived.** `rawExactInputsMinor` / `rawPercentageBp` exist to repopulate the edit form, but an expense's `shares` are computed once at write time and never recomputed. This means changing the split algorithm doesn't retroactively rewrite past expenses — financial history stays immutable — and the invariant check is what keeps stored shares self-consistent.
 - **The share-sum invariant is enforced at both trust boundaries.** An expense whose shares don't account for its total throws at the reducer (a programmer error — the form validates first), while state loaded from `localStorage` is treated as untrusted input and discarded in favour of a clean slate if it fails validation. This matters because a single reference to an unknown person id would otherwise make every balance `NaN`.
-- **No person deletion.** The brief only asks for *adding* people to a group; removing someone who's already referenced in existing expenses raises data-integrity questions (reassign their shares? block deletion? orphan the reference?) that aren't specified. Rather than half-implement this, it's left out — see "Left incomplete" below.
+- **Person removal is allowed only while nobody references them.** Removing someone already referenced by an expense raises data-integrity questions the brief doesn't specify (reassign their shares? orphan the reference?). Rather than pick an answer, removal is refused while any expense names the person as payer, participant or share holder — the button is disabled with the reason, and the reducer enforces it independently so the UI and the state layer can't disagree. Renaming is always allowed, because ids are stable and every reference is by id.
+- **Duplicate names are rejected** (case-insensitive, trimmed). Two people called "Alice" are indistinguishable in the payer dropdown, the participant checkboxes, the balances list and every settlement line.
+- **Clear all data** resets the group so the app can be reused for a new trip, behind a confirmation that states exactly what will be deleted.
 - **Tech stack: React + TypeScript + Vite**, no UI kit, no external state management library (React Context + `useReducer` is sufficient for two small in-memory arrays), no router (a persistent tab bar is enough for a single-page flow). Chosen to move fastest on the actual point of the exercise — correct split/rounding/settle-up math — rather than spend time on infrastructure the brief explicitly says doesn't matter.
 
 ## Verifying the brief's acceptance scenario
@@ -62,7 +64,7 @@ Beyond the fixed scenario, the suite includes property tests: the settle-up solv
 
 ## What I'd do differently / build next with more time
 
-- **Person deletion / reassignment** — with a clear spec on what should happen to their existing expense shares (block deletion while referenced, vs. a reassignment flow).
+- **Reassigning a referenced person** — removal is currently blocked while someone is referenced; a "replace Alice with Bob across these 3 expenses" flow would handle the case where somebody was added twice under different spellings.
 - **Multi-currency support** — the money layer is already isolated behind `src/lib/money.ts`, so this is a contained change, but the brief explicitly scopes to LKR only.
 - **Auto-adjust option for mismatched splits** — e.g. a "distribute the remainder for me" button for Exact/Percentage splits, instead of only blocking with an error.
 - **Expense-level notes/categories/dates** — kept the data model minimal since the brief prioritizes split/settle-up correctness over feature breadth.
@@ -72,6 +74,11 @@ Beyond the fixed scenario, the suite includes property tests: the settle-up solv
 
 ## What's left incomplete, and why
 
-- **Person deletion** (see above) — deliberately out of scope rather than half-built, since the brief doesn't specify the intended behavior for expenses referencing a deleted person.
-- **UI polish** — styling is minimal and functional per the brief's explicit guidance ("a correct, plain-looking app beats a beautiful one with wrong balances").
-- Everything else in the brief's core requirements and the rounding/settle-up "must handle" section is implemented and tested.
+- **Removing a person who is referenced by an expense** — refused rather than half-implemented, since the brief doesn't specify what should happen to their shares. Delete the expenses first, or rename them if it was a typo.
+- **No undo** — Clear all data and expense deletion are confirmed but not reversible.
+- **No component tests** — logic is well covered, but the UI is verified by driving a real headless browser rather than by unit tests.
+- Everything in the brief's core requirements and the rounding/settle-up "must handle" section is implemented and tested.
+
+## Accessibility and responsiveness
+
+Every interactive element has a visible `:focus-visible` ring and the app is fully keyboard-navigable; the confirmation dialog uses the native `<dialog>` element, so focus trapping and Esc-to-cancel come from the platform. The layout stacks below 640px with 44px touch targets and no horizontal overflow at 320px and up, and colours are defined as custom properties with a `prefers-color-scheme: dark` override.
