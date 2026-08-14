@@ -1,14 +1,38 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --border: #d9d9df;
-  --bg: #f7f7fa;
+  --border: #dcdce3;
+  --border-strong: #c2c2cc;
+  --bg: #f5f6f8;
   --panel-bg: #ffffff;
-  --text: #1a1a1e;
-  --muted: #6b6b76;
-  --positive: #157a3d;
+  --text: #17171c;
+  --muted: #63636e;
+  --positive: #12703a;
   --negative: #b3261e;
   --accent: #3454d1;
+  --accent-contrast: #ffffff;
+  --chip-bg: #f0f1f5;
+  --focus: #3454d1;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(20, 20, 40, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --border: #32323c;
+    --border-strong: #45454f;
+    --bg: #131318;
+    --panel-bg: #1c1c22;
+    --text: #ececf1;
+    --muted: #9a9aa6;
+    --positive: #4ade80;
+    --negative: #ff6b6b;
+    --accent: #7d95f0;
+    --accent-contrast: #12121a;
+    --chip-bg: #26262e;
+    --focus: #7d95f0;
+    --shadow: none;
+  }
 }
 
 * {
@@ -19,6 +43,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  line-height: 1.5;
 }
 
 .app {
@@ -29,18 +54,37 @@ body {
 
 .app-header h1 {
   margin: 0 0 4px;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
   color: var(--muted);
   margin: 0 0 20px;
+  font-size: 0.9rem;
 }
+
+/* Money reads as a column, so keep the digits from shifting width. */
+.amount,
+.balance-amount,
+.settlement-amount,
+.count-chip {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- tabs --- */
 
 .tab-bar {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-button {
@@ -51,6 +95,12 @@ body {
   font-size: 0.95rem;
   color: var(--muted);
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  border-radius: 0;
+}
+
+.tab-button:hover {
+  color: var(--text);
 }
 
 .tab-button.active {
@@ -59,56 +109,120 @@ body {
   font-weight: 600;
 }
 
+/* --- panels --- */
+
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 16px 20px;
   margin-bottom: 20px;
+  box-shadow: var(--shadow);
 }
 
 .panel h2 {
   margin-top: 0;
+  font-size: 1.15rem;
 }
 
-.inline-form {
+.panel-head {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.inline-form input {
-  flex: 1;
+.panel-head h2 {
+  margin-bottom: 12px;
 }
+
+.count-chip {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--chip-bg);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 12px;
+}
+
+/* --- controls --- */
 
 input,
 select,
-button {
+button,
+textarea {
+  font: inherit;
   font-size: 0.95rem;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: white;
+  padding: 9px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text);
 }
 
 button {
   cursor: pointer;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   border-color: var(--accent);
+  font-weight: 500;
+  transition: filter 0.15s ease, background 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 button.secondary {
-  background: white;
+  background: var(--panel-bg);
   color: var(--text);
-  border-color: var(--border);
+  border-color: var(--border-strong);
 }
 
 button.danger {
-  background: white;
+  background: var(--panel-bg);
   color: var(--negative);
   border-color: var(--negative);
 }
+
+button.danger-solid {
+  background: var(--negative);
+  color: #ffffff;
+  border-color: var(--negative);
+}
+
+button.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inline-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- people --- */
 
 .people-list,
 .expense-list,
@@ -119,45 +233,104 @@ button.danger {
   margin: 0;
 }
 
-.people-list li {
-  padding: 6px 0;
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
-.empty-state {
-  color: var(--muted);
-  font-style: italic;
+.person-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
+
+.person-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.person-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.person-edit-form {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.next-step {
+  margin: 14px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-strong);
+  flex-wrap: wrap;
+}
+
+.danger-zone-note {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  max-width: 46ch;
+}
+
+/* --- forms --- */
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 14px;
   border: none;
   padding: 0;
 }
 
+.form-row > span,
 .form-row legend {
   font-weight: 600;
+  font-size: 0.88rem;
   padding: 0;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .checkbox-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-direction: row;
   font-weight: normal;
-  margin-bottom: 4px;
+  padding: 5px 0;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  accent-color: var(--accent);
 }
 
 .split-editor {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 14px;
+  background: var(--bg);
 }
 
 .split-editor-row {
@@ -165,16 +338,27 @@ button.danger {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  padding: 5px 0;
 }
 
 .split-editor-row input {
-  width: 110px;
+  width: 120px;
+  max-width: 45%;
+  text-align: right;
 }
 
 .split-total {
   margin: 8px 0 0;
   font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.split-total.ok {
+  color: var(--positive);
+}
+
+.split-total.error {
+  color: var(--negative);
 }
 
 .split-note,
@@ -191,21 +375,22 @@ button.danger {
 
 .field-error {
   color: var(--negative);
-  font-size: 0.8rem;
-}
-
-.split-total.ok {
-  color: var(--positive);
-}
-
-.split-total.error {
-  color: var(--negative);
+  font-size: 0.82rem;
+  margin: 4px 0 0;
 }
 
 .form-actions {
   display: flex;
   gap: 8px;
 }
+
+/* Highlights the form when Edit pulls it into view, so the jump is legible. */
+.editing-target .panel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* --- expenses --- */
 
 .expense-row {
   display: flex;
@@ -216,20 +401,39 @@ button.danger {
   border-bottom: 1px solid var(--border);
 }
 
+.expense-row.is-editing {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 8px;
+  padding-inline: 10px;
+}
+
+.expense-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .expense-meta {
   color: var(--muted);
-  font-size: 0.85rem;
-  margin-top: 4px;
+  font-size: 0.84rem;
+  margin-top: 3px;
 }
 
 .badge {
   display: inline-block;
-  font-size: 0.75rem;
-  background: var(--bg);
+  font-size: 0.72rem;
+  background: var(--chip-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1px 8px;
-  margin-left: 8px;
+  border-radius: 999px;
+  padding: 1px 9px;
+  color: var(--muted);
+}
+
+.badge.editing {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .expense-actions {
@@ -238,13 +442,26 @@ button.danger {
   flex-shrink: 0;
 }
 
+/* --- balances & settlement --- */
+
 .balance-row,
 .settlement-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  gap: 12px;
+  padding: 11px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.balance-name {
+  font-weight: 500;
+}
+
+.balance-label {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.85rem;
 }
 
 .balance-amount.positive {
@@ -263,4 +480,129 @@ button.danger {
 
 .settlement-amount {
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.copy-fallback textarea {
+  width: 100%;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-style: italic;
+  margin: 10px 0;
+}
+
+/* --- dialog --- */
+
+.confirm-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+  color: var(--text);
+  padding: 20px 22px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.confirm-dialog::backdrop {
+  background: rgba(10, 10, 20, 0.45);
+}
+
+.confirm-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.confirm-dialog p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --- narrow screens --- */
+
+@media (max-width: 640px) {
+  .app {
+    padding: 16px 12px 48px;
+  }
+
+  .panel {
+    padding: 14px 14px;
+    border-radius: 8px;
+  }
+
+  .tab-button {
+    padding: 10px 9px;
+    font-size: 0.88rem;
+  }
+
+  /* Drop the step numbers so all four tabs fit rather than clipping. */
+  .tab-step {
+    display: none;
+  }
+
+  /* Stack rows so buttons and text stop competing for width. */
+  .expense-row,
+  .danger-zone {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .expense-actions,
+  .person-actions,
+  .form-actions,
+  .confirm-actions {
+    width: 100%;
+  }
+
+  .expense-actions button,
+  .person-actions button,
+  .form-actions button,
+  .confirm-actions button,
+  .danger-zone button {
+    flex: 1;
+  }
+
+  .inline-form {
+    flex-wrap: wrap;
+  }
+
+  .inline-form input {
+    flex-basis: 100%;
+  }
+
+  .inline-form button {
+    flex: 1;
+  }
+
+  .person-row {
+    align-items: flex-start;
+  }
+
+  /* Comfortable touch targets. */
+  button,
+  input,
+  select {
+    min-height: 44px;
+  }
+
+  .checkbox-row input {
+    min-height: 0;
+  }
+
+  .split-editor-row input {
+    width: 110px;
+  }
 }
