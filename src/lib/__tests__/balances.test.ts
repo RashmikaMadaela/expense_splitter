@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeBalances, countNaivePairwiseDebts } from '../balances';
+import { computeBalances, countNaivePairwiseDebts, computeTotalSpent } from '../balances';
 import { computeShares } from '../splitCalculator';
 import type { Expense, Person } from '../../types';
 
@@ -105,6 +105,16 @@ describe('computeBalances - edge cases', () => {
     expect(Object.keys(balances).sort()).toEqual(['alice', 'bob', 'carol', 'dave']);
     expect(Object.values(balances).every((b) => Number.isFinite(b))).toBe(true);
     expect(balances.alice).toBe(-500);
+  });
+});
+
+describe('computeTotalSpent', () => {
+  it('sums the acceptance scenario to Rs 28,000', () => {
+    expect(computeTotalSpent(acceptanceExpenses)).toBe(2_800_000);
+  });
+
+  it('is zero with no expenses', () => {
+    expect(computeTotalSpent([])).toBe(0);
   });
 });
 

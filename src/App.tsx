@@ -17,10 +17,10 @@ function AppShell() {
       </header>
       <TabBar active={tab} onChange={setTab} />
       <main className="app-main">
-        {tab === 'people' && <PeopleManager />}
-        {tab === 'expenses' && <ExpensesTab />}
-        {tab === 'balances' && <BalancesView />}
-        {tab === 'settleup' && <SettleUpView />}
+        {tab === 'people' && <PeopleManager onNavigate={setTab} />}
+        {tab === 'expenses' && <ExpensesTab onNavigate={setTab} />}
+        {tab === 'balances' && <BalancesView onNavigate={setTab} />}
+        {tab === 'settleup' && <SettleUpView onNavigate={setTab} />}
       </main>
     </div>
   );

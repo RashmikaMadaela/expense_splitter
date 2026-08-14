@@ -37,6 +37,11 @@ export function computeBalances(
   return balances;
 }
 
+/** Total logged across all expenses, in minor units. */
+export function computeTotalSpent(expenses: Expense[]): number {
+  return expenses.reduce((acc, e) => acc + e.totalAmountMinor, 0);
+}
+
 /**
  * How many payments a naive "everyone settles directly with whoever paid"
  * approach would need, after netting each pair off against each other.
