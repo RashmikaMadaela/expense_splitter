@@ -1,4 +1,5 @@
 import type { PersonId, Person } from '../../types';
+import { parsePercentToBp, bpToPercentString } from '../../lib/money';
 import { validatePercentageSplit } from '../../lib/validation';
 
 interface Props {
@@ -8,15 +9,29 @@ interface Props {
 }
 
 export function PercentageSplitEditor({ participants, values, onChange }: Props) {
-  const percentages: Record<PersonId, number> = {};
+  const percentagesBp: Record<PersonId, number> = {};
+  let parseError: string | null = null;
+
   for (const p of participants) {
-    percentages[p.id] = parseFloat(values[p.id] || '0') || 0;
+    const raw = values[p.id]?.trim();
+    if (!raw) {
+      percentagesBp[p.id] = 0;
+      continue;
+    }
+    const parsed = parsePercentToBp(raw);
+    if (!parsed.ok) {
+      parseError ??= parsed.error!;
+      percentagesBp[p.id] = 0;
+    } else {
+      percentagesBp[p.id] = parsed.minor!;
+    }
   }
+
   const result = validatePercentageSplit(
-    percentages,
+    percentagesBp,
     participants.map((p) => p.id),
   );
-  const sum = participants.reduce((acc, p) => acc + percentages[p.id], 0);
+  const sumBp = participants.reduce((acc, p) => acc + percentagesBp[p.id], 0);
 
   return (
     <div className="split-editor">
@@ -24,10 +39,8 @@ export function PercentageSplitEditor({ participants, values, onChange }: Props)
         <label key={p.id} className="split-editor-row">
           <span>{p.name}</span>
           <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
+            type="text"
+            inputMode="decimal"
             value={values[p.id] ?? ''}
             onChange={(e) => onChange(p.id, e.target.value)}
             placeholder="0"
@@ -35,8 +48,8 @@ export function PercentageSplitEditor({ participants, values, onChange }: Props)
           <span className="unit">%</span>
         </label>
       ))}
-      <p className={`split-total ${result.valid ? 'ok' : 'error'}`}>
-        {result.valid ? `Total: ${sum.toFixed(2)}% ✓` : result.message}
+      <p className={`split-total ${!parseError && result.valid ? 'ok' : 'error'}`}>
+        {parseError ?? (result.valid ? `Total: ${bpToPercentString(sumBp)}% ✓` : result.message)}
       </p>
     </div>
   );

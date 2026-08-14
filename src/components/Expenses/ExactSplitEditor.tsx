@@ -1,5 +1,5 @@
 import type { PersonId, Person } from '../../types';
-import { rupeesToMinor, formatMinor } from '../../lib/money';
+import { parseAmountToMinor, formatMinor } from '../../lib/money';
 import { validateExactSplit } from '../../lib/validation';
 
 interface Props {
@@ -11,9 +11,23 @@ interface Props {
 
 export function ExactSplitEditor({ totalAmountMinor, participants, values, onChange }: Props) {
   const exactAmountsMinor: Record<PersonId, number> = {};
+  let parseError: string | null = null;
+
   for (const p of participants) {
-    exactAmountsMinor[p.id] = rupeesToMinor(parseFloat(values[p.id] || '0') || 0);
+    const raw = values[p.id]?.trim();
+    if (!raw) {
+      exactAmountsMinor[p.id] = 0;
+      continue;
+    }
+    const parsed = parseAmountToMinor(raw);
+    if (!parsed.ok) {
+      parseError ??= parsed.error!;
+      exactAmountsMinor[p.id] = 0;
+    } else {
+      exactAmountsMinor[p.id] = parsed.minor!;
+    }
   }
+
   const result = validateExactSplit(
     totalAmountMinor,
     exactAmountsMinor,
@@ -26,19 +40,16 @@ export function ExactSplitEditor({ totalAmountMinor, participants, values, onCha
         <label key={p.id} className="split-editor-row">
           <span>{p.name}</span>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
             value={values[p.id] ?? ''}
             onChange={(e) => onChange(p.id, e.target.value)}
             placeholder="0.00"
           />
         </label>
       ))}
-      <p className={`split-total ${result.valid ? 'ok' : 'error'}`}>
-        {result.valid
-          ? `Total: ${formatMinor(totalAmountMinor)} ✓`
-          : result.message}
+      <p className={`split-total ${!parseError && result.valid ? 'ok' : 'error'}`}>
+        {parseError ?? (result.valid ? `Total: ${formatMinor(totalAmountMinor)} ✓` : result.message)}
       </p>
     </div>
   );

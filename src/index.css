@@ -177,6 +177,23 @@ button.danger {
   font-weight: 600;
 }
 
+.split-note,
+.settlement-summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
+.settlement-summary {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+.field-error {
+  color: var(--negative);
+  font-size: 0.8rem;
+}
+
 .split-total.ok {
   color: var(--positive);
 }
