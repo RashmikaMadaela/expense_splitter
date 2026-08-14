@@ -42,3 +42,60 @@ Fix: bumped a `formKey` counter on every successful submit (`src/components/Expe
 - `npx tsc -b` — clean, no type errors.
 - `npm run build` — clean production build.
 - Manual browser walkthrough of the full brief scenario, plus an edit/delete recalculation check — both correct.
+
+---
+
+# Phase 2 — Algorithmic hardening
+
+Phase 1 was correct on the brief's scenario. Phase 2 asked a harder question: is it correct in general, and is "minimum transactions" actually minimum? Work happened on `feat/algorithmic-hardening`.
+
+## 7. Checking the review before acting on it
+
+A code review of Phase 1 proposed several changes. Rather than implement them on trust, each claim got checked against the code or brute-forced. Two did not survive:
+
+- **"Greedy misses cases like Alice +100 / Bob −100 / Carol +50 / Dave −50."** Greedy returns 2 payments there, which is already optimal — sorting both sides descending happens to align the exact matches. The *concern* was sound, the example wasn't.
+- **"Removing a participant from an exact split may fall through to largest-remainder."** It doesn't. The submit path iterates `participantIds`, so a removed person is excluded from the sum, validation blocks the mismatch, and `exact` has its own branch in `computeShares` that never reaches the apportionment code.
+
+The underlying concerns were still worth acting on, which is why the prepass and invariant work stayed in. But the specific claims were wrong, and implementing them as stated would have added code for non-problems.
+
+**Greedy really is suboptimal, though.** Brute-forced against the true minimum over 200,000 random instances: suboptimal in **5.74%** of cases, by up to 2 extra transactions. So the conclusion held even though the example didn't.
+
+## 8. Independent audit — the interesting finds
+
+Checking the review's list meant reading the algorithms closely, which turned up five more issues it hadn't raised.
+
+**The split calculator did its core arithmetic in floating point.** `distributeByWeights` computed each share as `total * weight / totalWeight` in floats and compared float fractional parts to decide who absorbed the leftover cent — inside the one module whose entire premise is that money never touches floats. The float fraction isn't the true remainder, so the extra cent landed on the wrong participant about once in 13,000 splits (31 cases per 400,000). Notably the `sum === total` invariant *never* broke across 400,000 trials, so this was a fairness defect rather than a money leak — the kind of thing that passes every test you'd think to write. Fixed by integer division plus `%` for the exact remainder, which needs integer weights, which is what made basis points a prerequisite rather than just a nice idea.
+
+**`Int32Array` in the new exact solver would have overflowed** — caught while designing it, before writing it. Int32 caps at Rs. 21,474,836.47; a larger group total wraps silently negative and produces wrong groupings. Float64 holds integers exactly to 2^53.
+
+**`computeBalances` turned everything into `NaN`** if an expense referenced an unknown person id: `balances[unknownId] += n` evaluates `undefined + n` to `NaN` *and* adds a phantom key, so one bad reference poisons every balance, the zero-sum check and the settlement, surfacing as "Rs. NaN".
+
+**`Math.round(parseFloat(x) * 100)` isn't exact** — `2.675 * 100` is `267.4999…`, rounding to 267. And `step="0.01"` doesn't stop anyone typing `0.006`, which was silently accepted as 1 minor unit.
+
+**`crypto.randomUUID()` is undefined outside a secure context** — over plain `http://` on a LAN, which is a realistic way to use this on an actual trip, adding a person would throw.
+
+## 9. Making settle-up provably optimal
+
+The key realisation: minimum payments for n people is exactly `n − k`, where `k` is the largest number of disjoint zero-sum groups the balances partition into. Each group needs `|group| − 1` payments and can't beat that, because a maximal partition leaves no proper zero-sum subset inside any group. So maximise `k` (bitmask DP over subsets), then settle greedily *within* each group — greedy is provably optimal there.
+
+Bounded at 16 nonzero balances by measurement, not guesswork: worst case 23ms at n=16, 149ms at n=18, 2.1s at n=20. The bound counts *nonzero balances*, not group size, so a 30-person trip where most people come out even still gets the exact answer.
+
+Exact-pair stripping runs first. It was verified safe over 118,000 instances (zero cases where it reduced the achievable `k`) and pays off twice — it shrinks the DP's search space, and it takes the >16 fallback from 5.74% to 1.75% suboptimal.
+
+Testing this needed care: validating the DP against itself would prove nothing. The oracle is the recursive optimal-account-balancing search — a deliberately different algorithm — run across 3,000 random instances.
+
+## 10. What stayed the same
+
+Every optimisation had to leave correct output untouched, so that was the primary regression check. The acceptance scenario is unaffected by all of it, and for verifiable reasons rather than luck:
+
+- **Rotation** doesn't change it — all three expenses either divide evenly (12,000/4 and 6,000/2) or are exact splits, so no remainder ever arises.
+- **The exact solver** doesn't change it — those balances have no proper zero-sum subset, so `k=1`, one group of four, same 3 payments.
+- **The personId tie-break** doesn't change it — no two balances tie.
+
+Confirmed in a real browser after the rewrite: same balances, same 3-payment trace, now annotated "6 payments → 3, provable minimum."
+
+## 11. Final checks
+
+- `npm run test` — 65/65 passing across 5 suites, including the oracle and fuzz tests.
+- `npx tsc --noEmit` and `npm run build` — clean.
+- Browser regression: acceptance scenario byte-identical to Phase 1; 99.99% percentage split rejected; 3-decimal amount rejected with inline feedback; rotation spread the extra cent across Alice, Bob and Carol over 6 identical splits; hand-corrupted `localStorage` fell back to empty state with no "Rs. NaN" anywhere; zero console errors.

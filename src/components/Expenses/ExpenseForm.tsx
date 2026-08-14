@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { Expense, PersonId, SplitType } from '../../types';
 import { useAppState, useAppDispatch } from '../../state/AppContext';
-import { rupeesToMinor, minorToRupees } from '../../lib/money';
+import { parseAmountToMinor, parsePercentToBp, minorToRupeeString, bpToPercentString } from '../../lib/money';
 import { computeShares } from '../../lib/splitCalculator';
 import { validateExactSplit, validatePercentageSplit } from '../../lib/validation';
+import { randomId } from '../../lib/id';
 import { EqualSplitPreview } from './EqualSplitPreview';
 import { ExactSplitEditor } from './ExactSplitEditor';
 import { PercentageSplitEditor } from './PercentageSplitEditor';
@@ -13,38 +14,44 @@ interface Props {
   onDone: () => void;
 }
 
-function stringifyMinor(minor: number): string {
-  return (minorToRupees(minor)).toFixed(2);
-}
-
 export function ExpenseForm({ editingExpense, onDone }: Props) {
   const { people } = useAppState();
   const dispatch = useAppDispatch();
 
+  // Fixed for the life of the form. The id seeds remainder rotation, so the
+  // live preview has to use the same one the saved expense will, or the
+  // preview could show a different person absorbing the leftover cent.
+  const [expenseId] = useState(() => editingExpense?.id ?? randomId());
+
   const [description, setDescription] = useState(editingExpense?.description ?? '');
   const [amount, setAmount] = useState(
-    editingExpense ? stringifyMinor(editingExpense.totalAmountMinor) : '',
+    editingExpense ? minorToRupeeString(editingExpense.totalAmountMinor) : '',
   );
   const [paidBy, setPaidBy] = useState<PersonId>(editingExpense?.paidBy ?? people[0]?.id ?? '');
   const [participantIds, setParticipantIds] = useState<PersonId[]>(
     editingExpense?.participantIds ?? people.map((p) => p.id),
   );
   const [splitType, setSplitType] = useState<SplitType>(editingExpense?.splitType ?? 'equal');
-  const [exactValues, setExactValues] = useState<Record<PersonId, string>>(() => {
-    const raw = editingExpense?.rawExactInputsMinor;
-    if (!raw) return {};
-    return Object.fromEntries(Object.entries(raw).map(([id, m]) => [id, stringifyMinor(m)]));
-  });
-  const [percentValues, setPercentValues] = useState<Record<PersonId, string>>(
-    editingExpense?.rawPercentages
-      ? Object.fromEntries(
-          Object.entries(editingExpense.rawPercentages).map(([id, v]) => [id, String(v)]),
-        )
-      : {},
+  const [exactValues, setExactValues] = useState<Record<PersonId, string>>(() =>
+    Object.fromEntries(
+      Object.entries(editingExpense?.rawExactInputsMinor ?? {}).map(([id, m]) => [
+        id,
+        minorToRupeeString(m),
+      ]),
+    ),
+  );
+  const [percentValues, setPercentValues] = useState<Record<PersonId, string>>(() =>
+    Object.fromEntries(
+      Object.entries(editingExpense?.rawPercentageBp ?? {}).map(([id, bp]) => [
+        id,
+        bpToPercentString(bp),
+      ]),
+    ),
   );
   const [error, setError] = useState<string | null>(null);
 
-  const totalAmountMinor = rupeesToMinor(parseFloat(amount || '0') || 0);
+  const parsedAmount = parseAmountToMinor(amount);
+  const totalAmountMinor = parsedAmount.ok ? parsedAmount.minor! : 0;
   const participants = people.filter((p) => participantIds.includes(p.id));
 
   function toggleParticipant(id: PersonId) {
@@ -58,18 +65,21 @@ export function ExpenseForm({ editingExpense, onDone }: Props) {
     setError(null);
 
     if (!description.trim()) return setError('Enter a description.');
+    if (!parsedAmount.ok) return setError(parsedAmount.error!);
     if (totalAmountMinor <= 0) return setError('Enter an amount greater than zero.');
     if (!paidBy) return setError('Choose who paid.');
     if (participantIds.length === 0) return setError('Select at least one participant.');
 
     let shares;
     let rawExactInputsMinor: Record<PersonId, number> | undefined;
-    let rawPercentages: Record<PersonId, number> | undefined;
+    let rawPercentageBp: Record<PersonId, number> | undefined;
 
     if (splitType === 'exact') {
       rawExactInputsMinor = {};
       for (const id of participantIds) {
-        rawExactInputsMinor[id] = rupeesToMinor(parseFloat(exactValues[id] || '0') || 0);
+        const parsed = parseAmountToMinor(exactValues[id] ?? '0');
+        if (!parsed.ok) return setError(parsed.error!);
+        rawExactInputsMinor[id] = parsed.minor!;
       }
       const result = validateExactSplit(totalAmountMinor, rawExactInputsMinor, participantIds);
       if (!result.valid) return setError(result.message ?? 'Exact amounts do not add up.');
@@ -80,25 +90,33 @@ export function ExpenseForm({ editingExpense, onDone }: Props) {
         exactAmountsMinor: rawExactInputsMinor,
       });
     } else if (splitType === 'percentage') {
-      rawPercentages = {};
+      rawPercentageBp = {};
       for (const id of participantIds) {
-        rawPercentages[id] = parseFloat(percentValues[id] || '0') || 0;
+        const parsed = parsePercentToBp(percentValues[id] ?? '0');
+        if (!parsed.ok) return setError(parsed.error!);
+        rawPercentageBp[id] = parsed.minor!;
       }
-      const result = validatePercentageSplit(rawPercentages, participantIds);
+      const result = validatePercentageSplit(rawPercentageBp, participantIds);
       if (!result.valid) return setError(result.message ?? 'Percentages do not add up.');
       shares = computeShares({
         totalAmountMinor,
         splitType,
         participantIds,
-        percentages: rawPercentages,
+        percentagesBp: rawPercentageBp,
+        rotationSeed: expenseId,
       });
     } else {
-      shares = computeShares({ totalAmountMinor, splitType, participantIds });
+      shares = computeShares({
+        totalAmountMinor,
+        splitType,
+        participantIds,
+        rotationSeed: expenseId,
+      });
     }
 
     const now = Date.now();
     const expense: Expense = {
-      id: editingExpense?.id ?? crypto.randomUUID(),
+      id: expenseId,
       description: description.trim(),
       totalAmountMinor,
       paidBy,
@@ -106,7 +124,7 @@ export function ExpenseForm({ editingExpense, onDone }: Props) {
       splitType,
       shares,
       rawExactInputsMinor,
-      rawPercentages,
+      rawPercentageBp,
       createdAt: editingExpense?.createdAt ?? now,
       updatedAt: now,
     };
@@ -136,13 +154,15 @@ export function ExpenseForm({ editingExpense, onDone }: Props) {
       <label className="form-row">
         <span>Amount (Rs.)</span>
         <input
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="0.00"
         />
+        {amount.trim() !== '' && !parsedAmount.ok && (
+          <span className="field-error">{parsedAmount.error}</span>
+        )}
       </label>
 
       <label className="form-row">
@@ -186,7 +206,11 @@ export function ExpenseForm({ editingExpense, onDone }: Props) {
       </fieldset>
 
       {splitType === 'equal' && (
-        <EqualSplitPreview totalAmountMinor={totalAmountMinor} participants={participants} />
+        <EqualSplitPreview
+          totalAmountMinor={totalAmountMinor}
+          participants={participants}
+          rotationSeed={expenseId}
+        />
       )}
       {splitType === 'exact' && (
         <ExactSplitEditor

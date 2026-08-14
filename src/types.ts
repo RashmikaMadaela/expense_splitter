@@ -24,8 +24,8 @@ export interface Expense {
   shares: SplitShare[];
   /** Only present for splitType 'exact'; preserves the user's literal entries for editing. */
   rawExactInputsMinor?: Record<PersonId, number>;
-  /** Only present for splitType 'percentage'; source of truth shares are re-derived from these. */
-  rawPercentages?: Record<PersonId, number>;
+  /** Only present for splitType 'percentage'; integer basis points (10000 = 100%). */
+  rawPercentageBp?: Record<PersonId, number>;
   createdAt: number;
   updatedAt: number;
 }
